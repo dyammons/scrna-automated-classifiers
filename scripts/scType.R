@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env Rscript
 
 #Load packages and sc-type functions
 library(Seurat)
@@ -6,7 +6,6 @@ library(HGNChelper)
 library(tidyverse)
 source("https://raw.githubusercontent.com/IanevskiAleksandr/sc-type/master/R/gene_sets_prepare.R")
 source("https://raw.githubusercontent.com/IanevskiAleksandr/sc-type/master/R/sctype_score_.R")
-source("https://raw.githubusercontent.com/dyammons/scrna-seq/main/analysis-code/customFunctions_Seuratv5.R") #custom plotting functions
 outName <- "scType"
 
 ### PBMC analysis
@@ -47,6 +46,11 @@ tissueName <- "PBMC_highRes"
 #Load data and increase clustering resolution
 seu.obj <- readRDS("../internal_data/20230505_adj_n5n5_12_5mt_QCfiltered_2500_res0.8_dims45_dist0.3_neigh30_S3.rds")
 seu.obj <- FindClusters(seu.obj, resolution = 1.6, algorithm = 3, graph.name = "integrated_snn", cluster.name = "clusterID_highRes")
+#Plot high res clustering results
+DimPlot(seu.obj, reduction = "umap", label = TRUE, repel = TRUE, group.by = "clusterID_highRes") + 
+  ggtitle("Unsupervised clustering (high res) of k9 PBMC query") + 
+  NoLegend()
+ggsave(paste0("../output/", outName, "/", tissueName, "_query_UMAP_highRes.png"), width = 7, height = 7)
 scRNAseqData_scaled <- as.matrix(seu.obj@assays$integrated$scale.data)
 #Format cell type gene signatures - only positive ct markers
 gene_sig <- read.csv("../external_data/supplemental_data_4.csv")
