@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env Rscript
 
-# Load packages and sc-type functions
+#Load packages
 library(Seurat)
 library(SingleR)
 library(tidyverse)
@@ -142,8 +142,8 @@ for (i in 1:(length(matches))) {
   gene_sig$celltype.l3[unlist(unname(matches[i]))] <- names(matches[i])
 }
 gene_sig <- c(
-    split(gene_sig$gene, gene_sig$celltype.l3), 
-    list("NK" = c("KLRF1", "STMN2", "PAX4", "NCR3", "F2RL3", "CD96", "IL2RB", "IGSF3", "FREM1", "FASLG"))
+  split(gene_sig$gene, gene_sig$celltype.l3), 
+  list("NK" = c("KLRF1", "STMN2", "PAX4", "NCR3", "F2RL3", "CD96", "IL2RB", "IGSF3", "FREM1", "FASLG"))
 )
 #Train
 ref_trained <- trainSingleR(
