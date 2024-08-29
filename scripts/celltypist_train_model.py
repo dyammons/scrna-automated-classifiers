@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env python3
 
-### get the software installed - run in ../software
+### get the software installed - run the following in ../software
 # singularity pull celltypist-latest.sif docker://quay.io/teichlab/celltypist:latest
 # dd if=/dev/zero of=overlay.img bs=1M count=500 && mkfs.ext3 overlay.img
 # Execute code with the following (bind mount path will vary): 
