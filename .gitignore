@@ -1,0 +1,8 @@
+external_data/
+internal_data/
+output/
+.ipynb_checkpoints/
+Rplots.pdf
+cute_seurat.sbatch
+logFiles/
+software/
