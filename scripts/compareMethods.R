@@ -4,12 +4,6 @@
 library(Seurat)
 library(tidyverse)
 outName <- "compare"
-colz <- list(
-  "sc-type" = "#B0CAE1",
-  "SingleR" = "#87B13F",
-  "Seurat" = "#20A0DA",
-  "CellTypist" = "#08B0A1"
-)
 
 ### Load in results of PBMC classifiers
 tissueName <- "PBMC"
@@ -62,7 +56,7 @@ ggsave(paste0("../output/compare/", outName, "_", tissueName, "_default_2step_an
 ## Load singleR predictions - assited cell basis
 annos <- read.csv(paste0("../output/", outName, "/", tissueName, "_assist_2step_anno_predict.csv"))
 seu.obj <- AddMetaData(seu.obj, setNames(annos$x, annos$X), paste0(outName, "_assist_2step_predicted.id"))
-DimPlot(seu.obj, reduction = "umap", label = TRUE, repel = TRUE, group.by = paste0(outName, "_assist_2step_predicted.id"))    
+DimPlot(seu.obj, reduction = "umap", label = TRUE, repel = TRUE, group.by = paste0(outName, "_assist_2step_predicted.id")) 
 ggsave(paste0("../output/compare/", outName, "_", tissueName, "_assist_2step_anno_UMAP.png"), width = 14, height = 7)
 ## Load the "true" cell type annotations that are avalible
 outName <- "compare"
@@ -73,11 +67,14 @@ seu.obj@meta.data <- seu.obj@meta.data %>%
   rownames_to_column() %>%
   left_join(seu.anno@meta.data[ , c("joinNames", "celltype.l3")], by = "joinNames") %>%
   column_to_rownames()
+#Save plot
 DimPlot(
   subset(seu.obj, cells = names(seu.obj$celltype.l3[! is.na(seu.obj$celltype.l3)])), 
   reduction = "umap", label = TRUE, repel = TRUE, group.by = "celltype.l3"
 ) + ggtitle("Ground truth of k9 PBMC query")
 ggsave(paste0("../output/", outName, "/", tissueName, "_query_truth_UMAP.png"), width = 14, height = 7)
+
+### Begin repetative code block; should convert to function...
 ## Assess classifier accuracy & precision with 5 base approaches
 metaData <- seu.obj@meta.data
 metaDataZ <- metaData %>% 
@@ -225,6 +222,58 @@ theme(
 )
 ggsave(paste0("../output/", outName, "/", tissueName, "_coor_highRes_refined.png"), width = 7, height = 7)
 
+## Assess classifier accuracy & precision -- with highres; refined; singleR revised
+metaData <- seu.obj@meta.data
+metaDataZ <- metaData %>% 
+  rownames_to_column() %>%
+  select(
+   celltype.l3, Seurat_predicted.id, scType_predicted.id, scType_highRes_predicted.id, scType_highRes_refined_predicted.id, celltypist_predicted.id, singleR_cluster_predicted.id, singleR_cluster_noCycle_predicted.id, singleR_default_2step_predicted.id, singleR_assist_2step_predicted.id
+  )
+metaDataZ$celltype.l3 <- as.character(metaDataZ$celltype.l3)
+metaDataZ <- metaDataZ[! is.na(metaDataZ$celltype.l3), ]
+metaDataZ$y <- apply(metaDataZ, 1, function(x) { length(unique(x)) })
+table(metaDataZ$y)
+metaDataZ$singleR_cluster_predicted.id[is.na(metaDataZ$singleR_cluster_predicted.id)] <- "Unknown" #fix NAs
+metaDataZ$singleR_cluster_noCycle_predicted.id[is.na(metaDataZ$singleR_cluster_noCycle_predicted.id)] <- "Unknown" #fix NAs
+metaDataZ$singleR_default_2step_predicted.id[is.na(metaDataZ$singleR_default_2step_predicted.id)] <- "Unknown" #fix NAs
+metaDataZ$singleR_assist_2step_predicted.id[is.na(metaDataZ$singleR_assist_2step_predicted.id)] <- "Unknown" #fix NAs
+colnames(metaDataZ)[1] <- "ground_truth"
+colz <- c("ground_truth", "Seurat_predicted.id", "scType_predicted.id", "scType_highRes_predicted.id", "scType_highRes_refined_predicted.id", "celltypist_predicted.id", "singleR_cluster_predicted.id", "singleR_cluster_noCycle_predicted.id", "singleR_default_2step_predicted.id", "singleR_assist_2step_predicted.id")
+overlap <- unlist(lapply(colz, function(x){
+  lapply(colz, function(y){
+    sum(metaDataZ[ , x] == metaDataZ[ , y])
+  })
+}))
+mat <- matrix(
+  round(overlap / nrow(metaDataZ), 2), 
+  ncol = 10, nrow = 10,
+  dimnames = list(colz, colz)
+)
+mat <- mat[rev(rownames(mat)), ]
+mat[row(mat) + col(mat) > nrow(mat) + 1] <- NA
+melted_cormat <- reshape2::melt(mat, na.rm = TRUE)
+# Heatmap
+ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "white", high = "red",
+                      limit = c(0,1), space = "Lab", 
+   name = "% overlapping\nannotations") +
+  theme_minimal() + 
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 12, hjust = 1))+
+ coord_fixed() + 
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+theme(
+  axis.title.x = element_blank(),
+  axis.title.y = element_blank(),
+  panel.grid.major = element_blank(),
+  panel.border = element_blank(),
+  panel.background = element_blank(),
+  axis.ticks = element_blank()
+)
+ggsave(paste0("../output/", outName, "/", tissueName, "_coor_highRes_refined_singleR.png"), width = 10, height = 10)
+
+## Plot F1 results
 res <- lapply(colz[c(2, 3, 6, 7)], function(x){
   metaDataZ <- metaDataZ[ , c(colz[1], x)]
   colnames(metaDataZ)[2] <- "predicted"
@@ -271,6 +320,7 @@ theme(
 ) + coord_fixed(ratio = 0.2)
 ggsave(paste0("../output/", outName, "/", tissueName, "_f1.png"), width = 10, height = 10)
 
+## Plot heatmap to investigate where inaccuracies were occuring
 lapply(colz[2:5], function(predictor){
   classyHelper.df <- as.data.frame(table(metaDataZ[ , "ground_truth"], metaDataZ[ , predictor])) %>%
     group_by(Var1) %>%
@@ -284,15 +334,11 @@ lapply(colz[2:5], function(predictor){
   ggplot(data = classyHelper.df, aes(Var1, Var2, fill = Percent))+
    geom_tile(color = "white") +
     viridis::scale_fill_viridis() + 
-  #  scale_fill_gradient2(low = "white", high = "red",
-  #                       limit = c(0,1), space = "Lab", 
-  #    name = "F1") +
     theme_minimal() + 
     labs(x = "Ground truth", y = "Predicted cell type", title = predictor) + 
    theme(axis.text.x = element_text(angle = 45, vjust = 1, 
       size = 12, hjust = 1))+
    coord_fixed() + 
-  # geom_text(aes(Var1, Var2, label = Freq), color = "black", size = 4) +
   theme(
     panel.grid.major = element_blank(),
     panel.border = element_blank(),
@@ -302,7 +348,7 @@ lapply(colz[2:5], function(predictor){
   ggsave(paste0("../output/", outName, "/", tissueName, "_", predictor, "_predHelp.png"), width = 10, height = 10)
 })
 
-## Replot with more linent assessment of accuracy
+## Replot coor plot with more linent assessment of accuracy
 metaData <- seu.obj@meta.data
 metaDataZ <- metaData %>% 
   rownames_to_column() %>%
@@ -419,8 +465,7 @@ theme(
 )
 ggsave(paste0("../output/", outName, "/", tissueName, "_Seurat_predicted.id_predHelp.png"), width = 10, height = 10)
 
-
-
+### For OS tissue; unsure if this is obsolete
 ## Load Seurat predictions
 outName <- "Seurat"
 annos <- read.csv(paste0("../output/", outName, "/", tissueName, "_anno_predict.csv"))
